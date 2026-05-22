@@ -4,54 +4,41 @@ import json
 import re
 from typing import List, Dict
 from dotenv import load_dotenv
-from google import generativeai as gaia
+from groq import Groq
 
-# .env dosyasını oku
 load_dotenv()
 
-# Ortam değişkenlerini çek
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
 
 async def generate_flashcards_raw(course_name: str) -> List[Dict[str, str]]:
-    # Demo modu aktifse veya anahtar yoksa test soruları dön (çökme olmasın)
-    if DEMO_MODE or not GOOGLE_API_KEY:
+    if DEMO_MODE or not GROQ_API_KEY:
         return [
             {"soru": "Demo: Bağlı liste nedir?", "cevap": "Elemanların düğümler halinde birbirine bağlandığı yapıdır."},
             {"soru": "Demo: Stack hangi prensiple çalışır?", "cevap": "LIFO (Son giren ilk çıkar) prensibiyle çalışır."}
         ]
 
-    # Gerçek API yapılandırması
-    gaia.configure(api_key=GOOGLE_API_KEY)
+    client = Groq(api_key=GROQ_API_KEY)
 
-    system_prompt = (
-        "Sen bir üniversite akademisyenisin. Verilen ders adıyla ilgili, flashcard mantığına uygun "
-        "(kısa soru ve net cevap) 3 adet popüler teknik soru-cevap çifti üret. "
-        "Yanıtı ekstra hiçbir markdown işareti veya açıklama eklemeden SADECE şu saf JSON formatında döndür: "
-        "[{'soru': '...', 'cevap': '...'}]"
+    prompt = (
+        f"Sen bir üniversite akademisyenisin. '{course_name}' dersiyle ilgili "
+        "flashcard mantığına uygun 3 adet soru-cevap çifti üret. "
+        "SADECE şu JSON formatında döndür, başka hiçbir şey yazma: "
+        '[{"soru": "...", "cevap": "..."}]'
     )
 
-    prompt = f"{system_prompt}\nDers: {course_name}"
-
-    # Gemini 1.5 Flash modelini JSON çıktısı vermeye zorlayarak tanımla
-    model = gaia.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        generation_config={
-            "temperature": 0.3,
-            "max_output_tokens": 512,
-            "response_mime_type": "application/json"
-        }
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+        max_tokens=512,
     )
 
-    # İstatistiksel olarak asenkron üretimi tetikle
-    response = model.generate_content(prompt)
-    text = response.text.strip() if hasattr(response, "text") else str(response)
+    text = response.choices[0].message.content.strip()
 
-    # Markdown blokları varsa temizle
     if text.startswith("```"):
-        text = text.strip("`").replace("json", "", 1).strip()
+        text = re.sub(r"```[a-z]*", "", text).replace("```", "").strip()
 
-    # Regex ile JSON dizisini ayıkla
     match = re.search(r"(\[\s*\{.*\}\s*\])", text, flags=re.DOTALL)
     candidate = match.group(1) if match else text
 
@@ -60,7 +47,6 @@ async def generate_flashcards_raw(course_name: str) -> List[Dict[str, str]]:
     except Exception as exc:
         raise ValueError(f"AI yanıtı JSON parse edilemedi: {exc}\nRaw: {text}")
 
-    # Alanları normalize et
     results: List[Dict[str, str]] = []
     for item in data:
         soru = item.get("soru") or item.get("question") or item.get("front")

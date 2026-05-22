@@ -33,6 +33,8 @@ class ExamResponseSchema(BaseModel):
     exam_date: date
     remaining_days: int
     daily_target: int
+    flashcard_count: int = 0
+    mastered_count: int = 0
 
     class Config:
         from_attributes = True

@@ -37,9 +37,16 @@ class ExamService:
         self.exam_repository.delete(exam)
 
     def build_study_session(self, exam: Exam, flashcards: list[Flashcard], completed_today: int = 0) -> StudySession:
+        from app.domain.enums import LeitnerBox
         remaining_days = max((exam.ExamDate - date.today()).days, 0)
-        total_cards = len(flashcards)
-        daily_target = total_cards if remaining_days <= 0 else max((total_cards + remaining_days - 1) // remaining_days, 1)
+        active_cards = [c for c in flashcards if c.Status != LeitnerBox.Mastered]
+        total_active = len(active_cards)
+        if total_active == 0:
+            daily_target = 0
+        elif remaining_days <= 0:
+            daily_target = total_active
+        else:
+            daily_target = max((total_active + remaining_days - 1) // remaining_days, 1)
         return StudySession(
             remaining_days=remaining_days,
             daily_target=daily_target,

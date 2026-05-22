@@ -1,52 +1,57 @@
 from __future__ import annotations
-import asyncio
 import os
 import json
 import re
 from typing import List, Dict
 from dotenv import load_dotenv
+from google import generativeai as gaia
 
+# .env dosyasını oku
 load_dotenv()
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+# Ortam değişkenlerini çek
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
 
+async def generate_flashcards_raw(course_name: str) -> List[Dict[str, str]]:
+    # Demo modu aktifse veya anahtar yoksa test soruları dön (çökme olmasın)
+    if DEMO_MODE or not GOOGLE_API_KEY:
+        return [
+            {"soru": "Demo: Bağlı liste nedir?", "cevap": "Elemanların düğümler halinde birbirine bağlandığı yapıdır."},
+            {"soru": "Demo: Stack hangi prensiple çalışır?", "cevap": "LIFO (Son giren ilk çıkar) prensibiyle çalışır."}
+        ]
 
-def _build_client():
-    """Groq client'ını oluşturur."""
-    from groq import Groq
-    return Groq(api_key=GROQ_API_KEY)
+    # Gerçek API yapılandırması
+    gaia.configure(api_key=GOOGLE_API_KEY)
 
-
-def _call_groq_sync(course_name: str) -> str:
-    """Senkron Groq API çağrısı yapar ve ham yanıt metnini döndürür."""
-    client = _build_client()
-
-    prompt = (
-        f"Sen bir üniversite akademisyenisin. '{course_name}' dersiyle ilgili "
-        "flashcard mantığına uygun 3 adet soru-cevap çifti üret. "
-        "SADECE şu JSON formatında döndür, başka hiçbir şey yazma: "
-        '[{"soru": "...", "cevap": "..."}]'
+    system_prompt = (
+        "Sen bir üniversite akademisyenisin. Verilen ders adıyla ilgili, flashcard mantığına uygun "
+        "(kısa soru ve net cevap) 3 adet popüler teknik soru-cevap çifti üret. "
+        "Yanıtı ekstra hiçbir markdown işareti veya açıklama eklemeden SADECE şu saf JSON formatında döndür: "
+        "[{'soru': '...', 'cevap': '...'}]"
     )
 
-    response = client.chat.completions.create(
-        model=GROQ_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,
-        max_tokens=512,
+    prompt = f"{system_prompt}\nDers: {course_name}"
+
+    # Gemini 1.5 Flash modelini JSON çıktısı vermeye zorlayarak tanımla
+    model = gaia.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        generation_config={
+            "temperature": 0.3,
+            "max_output_tokens": 512,
+            "response_mime_type": "application/json"
+        }
     )
 
-    return response.choices[0].message.content.strip()
+    # İstatistiksel olarak asenkron üretimi tetikle
+    response = model.generate_content(prompt)
+    text = response.text.strip() if hasattr(response, "text") else str(response)
 
-
-def _parse_ai_response(text: str) -> List[Dict[str, str]]:
-    """AI yanıtını JSON olarak parse eder."""
-    # Markdown kod bloğu varsa temizle
+    # Markdown blokları varsa temizle
     if text.startswith("```"):
-        text = re.sub(r"```[a-z]*", "", text).replace("```", "").strip()
+        text = text.strip("`").replace("json", "", 1).strip()
 
-    # JSON dizisini bul
+    # Regex ile JSON dizisini ayıkla
     match = re.search(r"(\[\s*\{.*\}\s*\])", text, flags=re.DOTALL)
     candidate = match.group(1) if match else text
 
@@ -55,6 +60,7 @@ def _parse_ai_response(text: str) -> List[Dict[str, str]]:
     except Exception as exc:
         raise ValueError(f"AI yanıtı JSON parse edilemedi: {exc}\nRaw: {text}")
 
+    # Alanları normalize et
     results: List[Dict[str, str]] = []
     for item in data:
         soru = item.get("soru") or item.get("question") or item.get("front")
@@ -64,17 +70,3 @@ def _parse_ai_response(text: str) -> List[Dict[str, str]]:
         results.append({"soru": str(soru).strip(), "cevap": str(cevap).strip()})
 
     return results
-
-
-async def generate_flashcards_raw(course_name: str) -> List[Dict[str, str]]:
-    """AI ile flashcard üretir. API key yoksa demo modda çalışır."""
-    if DEMO_MODE or not GROQ_API_KEY:
-        return [
-            {"soru": "Demo: Bağlı liste nedir?", "cevap": "Elemanların düğümler halinde birbirine bağlandığı yapıdır."},
-            {"soru": "Demo: Stack hangi prensiple çalışır?", "cevap": "LIFO (Son giren ilk çıkar) prensibiyle çalışır."}
-        ]
-
-    # Senkron Groq SDK çağrısını ayrı thread'de çalıştır
-    # böylece async event loop bloklanmaz
-    text = await asyncio.to_thread(_call_groq_sync, course_name)
-    return _parse_ai_response(text)

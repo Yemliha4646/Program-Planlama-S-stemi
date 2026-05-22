@@ -25,6 +25,8 @@ class Exam(Base):
     ExamId: Mapped[str] = mapped_column(String(36), primary_key=True, index=True)
     CourseName: Mapped[str] = mapped_column(String(100), nullable=False)
     ExamDate: Mapped[date] = mapped_column(Date, nullable=False)
+    flashcards: Mapped[List["Flashcard"]]
+
     flashcards = relationship(
         "Flashcard",
         back_populates="exam",

@@ -16,12 +16,16 @@ router = APIRouter(prefix="/api/exams", tags=["exams"])
 
 
 def build_exam_response(exam, session, flashcards):
+    from app.domain.enums import LeitnerBox
+    mastered = sum(1 for c in flashcards if c.Status == LeitnerBox.Mastered)
     return ExamResponseSchema(
         exam_id=exam.ExamId,
         course_name=exam.CourseName,
         exam_date=exam.ExamDate,
         remaining_days=session.remaining_days,
         daily_target=session.daily_target,
+        flashcard_count=len(flashcards),
+        mastered_count=mastered,
     )
 
 

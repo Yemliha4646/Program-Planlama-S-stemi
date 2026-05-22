@@ -3,3 +3,5 @@ venv/
 .idea/
 *.db
 __pycache__/
+.venv/
+__pycache__/

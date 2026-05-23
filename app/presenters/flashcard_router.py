@@ -1,3 +1,5 @@
+"""Flashcard API endpoint'leri — kart oluşturma, Leitner güncellemesi ve silme."""
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -11,6 +13,7 @@ router = APIRouter(prefix="/api/flashcards", tags=["flashcards"])
 
 @router.post("/", response_model=FlashcardResponseSchema, status_code=201)
 def create_flashcard(flashcard_payload: FlashcardCreateSchema, db: Session = Depends(get_db)) -> FlashcardResponseSchema:
+    """Yeni bir flashcard oluşturur ve ilişkili sınava bağlar."""
     exam_repository = ExamRepository(db)
     flashcard_repository = FlashcardRepository(db)
     flashcard_service = FlashcardService(flashcard_repository)
@@ -38,6 +41,7 @@ def create_flashcard(flashcard_payload: FlashcardCreateSchema, db: Session = Dep
 
 @router.patch("/{card_id}/leitner", response_model=FlashcardResponseSchema)
 def update_flashcard_leitner(card_id: str, status_payload: LeitnerUpdateSchema, db: Session = Depends(get_db)) -> FlashcardResponseSchema:
+    """Flashcard'ın Leitner kutusunu günceller (Bildim/Bilemedim)."""
     flashcard_repository = FlashcardRepository(db)
     flashcard_service = FlashcardService(flashcard_repository)
     flashcard = flashcard_repository.get(card_id)
@@ -60,6 +64,7 @@ def update_flashcard_leitner(card_id: str, status_payload: LeitnerUpdateSchema, 
 
 @router.delete("/{card_id}", status_code=204)
 def delete_flashcard(card_id: str, db: Session = Depends(get_db)) -> None:
+    """Flashcard'ı kalıcı olarak siler."""
     flashcard_repository = FlashcardRepository(db)
     flashcard = flashcard_repository.get(card_id)
     if flashcard is None:

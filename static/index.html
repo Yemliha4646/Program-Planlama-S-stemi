@@ -63,6 +63,9 @@
         border-radius: 0.75rem;
       }
 
+      /* ── Modal ─────────────────────────────────────── */
+      #edit-modal.active { display: flex; }
+
       /* ── Toast Bildirimi ───────────────────────────── */
       @keyframes toastIn  { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
       @keyframes toastOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
@@ -233,12 +236,47 @@
         </div>
       </section>
 
+    <!-- ── Sınav Düzenleme Modalı ──────────────────── -->
+    <div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div class="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 p-6 shadow-2xl mx-4 fade-up">
+        <h3 class="text-lg font-bold text-white mb-5 flex items-center gap-2">
+          <span class="text-emerald-400">📅</span> Sınav Tarihini Güncelle
+        </h3>
+        <form id="edit-exam-form" class="space-y-4">
+          <input type="hidden" id="edit-exam-id" />
+          <label class="block">
+            <span class="block mb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">Ders Adı</span>
+            <input id="edit-exam-course" disabled
+              class="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-slate-500 cursor-not-allowed" />
+          </label>
+          <label class="block">
+            <span class="block mb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">Yeni Sınav Tarihi</span>
+            <input id="edit-exam-date" type="date" required
+              class="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-slate-100
+                     outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 [color-scheme:dark]" />
+          </label>
+          <div class="flex gap-3 pt-2">
+            <button type="submit"
+              class="flex-1 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950
+                     shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 active:scale-[.98]">
+              Tarihi Güncelle
+            </button>
+            <button type="button" onclick="closeEditModal()"
+              class="flex-1 rounded-xl bg-slate-700 px-5 py-3 text-sm font-semibold text-slate-300
+                     transition hover:bg-slate-600 active:scale-[.98]">
+              İptal
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     </div>
 
     <!-- ── Footer ──────────────────────────────── -->
     <footer class="mt-16 border-t border-slate-800/50 py-6 text-center text-xs text-slate-600">
       <p>© 2026 Program Planlama Sistemi — Leitner tabanlı akıllı öğrenme platformu</p>
-      <p class="mt-1">FastAPI · SQLAlchemy · Groq AI</p>
+      <p class="mt-1">FastAPI · SQLAlchemy · Groq AI · Leitner</p>
     </footer>
 
     <script src="/static/app.js"></script>

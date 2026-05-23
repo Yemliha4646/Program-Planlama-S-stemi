@@ -209,6 +209,10 @@ function renderExamCards(exams) {
           </div>
         </div>` : ""}
       </button>
+      <button onclick="openEditModal('${exam.exam_id}', '${escapeHtml(exam.course_name)}', '${exam.exam_date}')"
+        class="flex items-center justify-center rounded-xl bg-sky-500/10 border border-sky-500/20
+               px-3.5 text-sky-400 text-base font-bold transition hover:bg-sky-500/20 hover:border-sky-400 active:scale-95"
+        title="Tarihi Düzenle">✏️</button>
       <button onclick="deleteExam('${exam.exam_id}')"
         class="flex items-center justify-center rounded-xl bg-rose-500/10 border border-rose-500/20
                px-3.5 text-rose-400 text-lg font-bold transition hover:bg-rose-500/20 hover:border-rose-400 active:scale-95"
@@ -314,7 +318,7 @@ async function loadFlashcards(examId) {
 
       return `
       <div class="card-container fade-up" style="min-height:210px;">
-        <div class="flashcard rounded-2xl cursor-pointer" onclick="toggleCard(this)" style="min-height:210px;">
+        <div class="flashcard rounded-2xl cursor-pointer" onclick="toggleCard(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCard(this)}" tabindex="0" role="button" aria-label="Kartı çevirmek için tıklayın" style="min-height:210px;">
 
           <!-- ÖN YÜZ -->
           <div class="card-face bg-slate-950 border border-slate-800 flex flex-col">
@@ -487,13 +491,82 @@ if (aiBtn) {
         throw new Error(data?.detail || "Yapay zekâ kart üretimi başarısız.");
       }
       
-      showToast("Yapay zekâ başarıyla 3 yeni soru üretti!", "success");
+      const generatedCards = await resp.json();
+      showToast(`Yapay zekâ başarıyla ${generatedCards.length} yeni soru üretti!`, "success");
       await selectExam(currentExam.exam_id);
     } catch (err) {
       showToast(friendlyError(err), "error");
     } finally {
       aiBtn.disabled = false;
       aiBtn.innerHTML = prev;
+    }
+  });
+}
+
+// ─── SINAV DÜZENLEME MODALI ─────────────────────────────
+
+const editModal     = document.getElementById("edit-modal");
+const editExamForm  = document.getElementById("edit-exam-form");
+
+window.openEditModal = function (examId, courseName, examDate) {
+  document.getElementById("edit-exam-id").value = examId;
+  document.getElementById("edit-exam-course").value = courseName;
+  const dateInput = document.getElementById("edit-exam-date");
+  dateInput.value = examDate;
+  // Yarından itibaren seçilebilir
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  dateInput.min = tomorrow.toISOString().split("T")[0];
+
+  if (editModal) {
+    editModal.classList.remove("hidden");
+    editModal.classList.add("active");
+  }
+};
+
+window.closeEditModal = function () {
+  if (editModal) {
+    editModal.classList.add("hidden");
+    editModal.classList.remove("active");
+  }
+};
+
+// Modal dışına tıklayınca kapat
+if (editModal) {
+  editModal.addEventListener("click", (e) => {
+    if (e.target === editModal) closeEditModal();
+  });
+}
+
+if (editExamForm) {
+  editExamForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const examId  = document.getElementById("edit-exam-id").value;
+    const newDate = document.getElementById("edit-exam-date").value;
+
+    if (!newDate || newDate <= todayISO()) {
+      showToast("Sınav tarihi bugünden ileri bir tarih olmalıdır.", "error");
+      return;
+    }
+
+    try {
+      const resp = await fetch(`${apiRoot}/exams/${examId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exam_date: newDate }),
+      });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => null);
+        throw new Error(data?.detail || `Güncelleme başarısız (${resp.status})`);
+      }
+      closeEditModal();
+      showToast("Sınav tarihi başarıyla güncellendi!", "success");
+      await fetchExams();
+      if (currentExam && currentExam.exam_id === examId) {
+        await selectExam(examId);
+      }
+    } catch (err) {
+      showToast("Güncelleme hatası: " + friendlyError(err), "error");
     }
   });
 }

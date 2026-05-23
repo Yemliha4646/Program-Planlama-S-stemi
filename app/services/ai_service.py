@@ -1,13 +1,17 @@
+"""Yapay zekâ servisi — Groq API üzerinden otomatik flashcard üretimi.
+
+Demo modu aktifse veya API anahtarı yoksa, yerel örnek kartlar üretir.
+"""
+
 from __future__ import annotations
 import os
 import json
+import logging
 import re
 import asyncio
-from typing import List, Dict
-from dotenv import load_dotenv
+from typing import Dict, List
 
-# .env dosyasını oku
-load_dotenv()
+logger = logging.getLogger(__name__)
 
 # Ortam değişkenlerini çek — .env'de GROQ_API_KEY tanımlı
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
@@ -26,6 +30,7 @@ def _call_groq_sync(course_name: str) -> str:
         '[{"soru": "...", "cevap": "..."}]'
     )
 
+    logger.info("Groq API çağrısı başlatılıyor — Ders: %s", course_name)
     response = client.chat.completions.create(
         messages=[
             {"role": "system", "content": system_prompt},
@@ -44,6 +49,7 @@ async def generate_flashcards_raw(course_name: str) -> List[Dict[str, str]]:
 
     # Demo modu aktifse veya API anahtarı yoksa örnek veri dön
     if DEMO_MODE or not GROQ_API_KEY:
+        logger.info("Demo modu aktif — yerel örnek kartlar dönülüyor. (Ders: %s)", course_name)
         return [
             {"soru": "Demo: Bağlı liste nedir?", "cevap": "Elemanların düğümler halinde birbirine bağlandığı yapıdır."},
             {"soru": "Demo: Stack hangi prensiple çalışır?", "cevap": "LIFO (Son giren ilk çıkar) prensibiyle çalışır."},
@@ -54,6 +60,7 @@ async def generate_flashcards_raw(course_name: str) -> List[Dict[str, str]]:
         # Senkron API çağrısını ayrı bir thread'de çalıştır — event loop'u bloklamaz
         text = await asyncio.to_thread(_call_groq_sync, course_name)
     except Exception as exc:
+        logger.error("Groq API çağrısı başarısız — %s", exc)
         raise ValueError(f"Yapay zekâ servisi şu anda yanıt veremiyor. Lütfen tekrar deneyin. (Detay: {exc})")
 
     # Regex ile JSON dizisini ayıkla (model bazen obje içinde döndürebilir)
@@ -79,6 +86,7 @@ async def generate_flashcards_raw(course_name: str) -> List[Dict[str, str]]:
     try:
         data = json.loads(candidate)
     except Exception as exc:
+        logger.warning("AI yanıtı JSON parse hatası — ham veri: %s", text[:200])
         raise ValueError(f"Yapay zekâ yanıtı işlenemedi. Lütfen tekrar deneyin.")
 
     if not isinstance(data, list) or len(data) == 0:
@@ -98,4 +106,5 @@ async def generate_flashcards_raw(course_name: str) -> List[Dict[str, str]]:
     if not results:
         raise ValueError("Yapay zekâ yanıtından geçerli soru-cevap çifti çıkarılamadı. Lütfen tekrar deneyin.")
 
+    logger.info("AI başarıyla %d soru-cevap çifti üretti. (Ders: %s)", len(results), course_name)
     return results

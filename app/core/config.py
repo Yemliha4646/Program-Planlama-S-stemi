@@ -1,7 +1,9 @@
 import os
+from collections.abc import Generator
+
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 load_dotenv()
 
@@ -12,10 +14,15 @@ engine = create_engine(
     future=True,
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
-Base = declarative_base()
 
 
-def get_db():
+class Base(DeclarativeBase):
+    """SQLAlchemy 2.0 uyumlu bildirimsel taban sınıfı."""
+    pass
+
+
+def get_db() -> Generator[Session, None, None]:
+    """Bağımlılık enjeksiyonu için veritabanı oturumu üretir."""
     db = SessionLocal()
     try:
         yield db

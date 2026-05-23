@@ -1,7 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
-from typing import List
 from uuid import uuid4
 
 from sqlalchemy import Date, ForeignKey, String
@@ -14,12 +13,14 @@ from app.domain.enums import LeitnerBox
 
 @dataclass
 class StudySession:
+    """Öğrencinin günlük çalışma durumunu ve hedeflerini tutan değer nesnesi (Value Object)."""
     remaining_days: int
     daily_target: int
     completed_today: int
 
 
 class Exam(Base):
+    """Sınav Aggregate Root — bir ders sınavını ve planlama metriklerini temsil eder."""
     __tablename__ = "exams"
 
     ExamId: Mapped[str] = mapped_column(String(36), primary_key=True, index=True)
@@ -35,17 +36,16 @@ class Exam(Base):
 
     @classmethod
     def create(cls, course_name: str, exam_date: date) -> "Exam":
+        """Yeni bir sınav nesnesi oluşturur ve UUID atar."""
         return cls(
             ExamId=str(uuid4()),
             CourseName=course_name.strip(),
             ExamDate=exam_date,
         )
 
-    def is_future(self) -> bool:
-        return self.ExamDate > date.today()
-
 
 class Flashcard(Base):
+    """Bir sınava ait çalışma kartını temsil eden varlık (Entity)."""
     __tablename__ = "flashcards"
 
     CardId: Mapped[str] = mapped_column(String(36), primary_key=True, index=True)
@@ -53,7 +53,7 @@ class Flashcard(Base):
         String(36), ForeignKey("exams.ExamId", ondelete="CASCADE"), nullable=False
     )
     FrontSide: Mapped[str] = mapped_column(String(500), nullable=False)
-    BackSide: Mapped[str] = mapped_column(String, nullable=False)
+    BackSide: Mapped[str] = mapped_column(String(2000), nullable=False)
     Status: Mapped[LeitnerBox] = mapped_column(
         SqlEnum(LeitnerBox, native_enum=False, length=50),
         nullable=False,
@@ -63,6 +63,7 @@ class Flashcard(Base):
 
     @classmethod
     def create(cls, exam_id: str, front_side: str, back_side: str) -> "Flashcard":
+        """Yeni bir flashcard nesnesi oluşturur, varsayılan kutu Box1'dir."""
         return cls(
             CardId=str(uuid4()),
             ExamId=exam_id,

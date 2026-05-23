@@ -1,16 +1,18 @@
 from datetime import date
-from typing import Optional
+from typing import Annotated
 
-from pydantic import BaseModel, constr, validator
+from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator
 
 from app.domain.enums import LeitnerBox
 
 
 class ExamCreateSchema(BaseModel):
-    course_name: constr(strip_whitespace=True, min_length=1, max_length=100)
+    """Yeni sınav oluşturma isteği için giriş şeması."""
+    course_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
     exam_date: date
 
-    @validator("exam_date")
+    @field_validator("exam_date")
+    @classmethod
     def ensure_future_date(cls, value: date) -> date:
         if value <= date.today():
             raise ValueError("ExamDate gelecekte olmalıdır.")
@@ -18,9 +20,11 @@ class ExamCreateSchema(BaseModel):
 
 
 class ExamUpdateSchema(BaseModel):
+    """Sınav tarihi güncelleme isteği için giriş şeması."""
     exam_date: date
 
-    @validator("exam_date")
+    @field_validator("exam_date")
+    @classmethod
     def ensure_future_date(cls, value: date) -> date:
         if value <= date.today():
             raise ValueError("ExamDate gelecekte olmalıdır.")
@@ -28,6 +32,7 @@ class ExamUpdateSchema(BaseModel):
 
 
 class ExamResponseSchema(BaseModel):
+    """Sınav yanıt şeması — sınav bilgileri ve planlama metrikleri içerir."""
     exam_id: str
     course_name: str
     exam_date: date
@@ -36,32 +41,34 @@ class ExamResponseSchema(BaseModel):
     flashcard_count: int = 0
     mastered_count: int = 0
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FlashcardCreateSchema(BaseModel):
+    """Yeni flashcard oluşturma isteği için giriş şeması."""
     exam_id: str
-    front_side: constr(strip_whitespace=True, min_length=1, max_length=500)
-    back_side: constr(strip_whitespace=True, min_length=1)
+    front_side: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+    back_side: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class LeitnerUpdateSchema(BaseModel):
+    """Leitner kutu güncelleme isteği — Bildim/Bilemedim."""
     known: bool
 
 
 class FlashcardResponseSchema(BaseModel):
+    """Flashcard yanıt şeması."""
     card_id: str
     exam_id: str
     front_side: str
     back_side: str
     status: LeitnerBox
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class StudySessionResponseSchema(BaseModel):
+    """Çalışma oturumu yanıt şeması."""
     remaining_days: int
     daily_target: int
     flashcard_count: int = 0
@@ -69,4 +76,5 @@ class StudySessionResponseSchema(BaseModel):
 
 
 class FlashcardListResponseSchema(BaseModel):
+    """Flashcard listesi sarmalayıcı şeması."""
     flashcards: list[FlashcardResponseSchema]

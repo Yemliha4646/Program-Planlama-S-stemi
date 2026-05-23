@@ -1,8 +1,11 @@
+"""Sınav API endpoint'leri — sınav CRUD, flashcard listeleme ve AI kart üretimi."""
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.config import get_db
 from app.domain.enums import LeitnerBox
+from app.domain.models import Flashcard
 from app.infrastructure.repositories import ExamRepository, FlashcardRepository
 from app.presenters.schemas import (
     ExamCreateSchema,
@@ -17,6 +20,7 @@ router = APIRouter(prefix="/api/exams", tags=["exams"])
 
 
 def build_exam_response(exam, session, flashcards) -> ExamResponseSchema:
+    """Sınav, oturum ve kartlardan ExamResponseSchema oluşturur."""
     mastered = sum(1 for c in flashcards if c.Status == LeitnerBox.Mastered)
     return ExamResponseSchema(
         exam_id=exam.ExamId,
@@ -31,6 +35,7 @@ def build_exam_response(exam, session, flashcards) -> ExamResponseSchema:
 
 @router.post("/", response_model=ExamResponseSchema, status_code=201)
 def create_exam(exam_payload: ExamCreateSchema, db: Session = Depends(get_db)) -> ExamResponseSchema:
+    """Yeni bir sınav oluşturur."""
     try:
         exam_service = ExamService(ExamRepository(db), FlashcardRepository(db))
         exam = exam_service.create_exam(exam_payload.course_name, exam_payload.exam_date)
@@ -42,6 +47,7 @@ def create_exam(exam_payload: ExamCreateSchema, db: Session = Depends(get_db)) -
 
 @router.get("/", response_model=list[ExamResponseSchema])
 def list_exams(db: Session = Depends(get_db)) -> list[ExamResponseSchema]:
+    """Tüm sınavları planlama metrikleriyle birlikte listeler."""
     exam_repository = ExamRepository(db)
     flashcard_repository = FlashcardRepository(db)
     exam_service = ExamService(exam_repository, flashcard_repository)
@@ -56,6 +62,7 @@ def list_exams(db: Session = Depends(get_db)) -> list[ExamResponseSchema]:
 
 @router.get("/{exam_id}", response_model=ExamResponseSchema)
 def get_exam(exam_id: str, db: Session = Depends(get_db)) -> ExamResponseSchema:
+    """Belirli bir sınavın detaylarını getirir."""
     exam_repository = ExamRepository(db)
     flashcard_repository = FlashcardRepository(db)
     exam_service = ExamService(exam_repository, flashcard_repository)
@@ -69,6 +76,7 @@ def get_exam(exam_id: str, db: Session = Depends(get_db)) -> ExamResponseSchema:
 
 @router.patch("/{exam_id}", response_model=ExamResponseSchema)
 def update_exam(exam_id: str, update_payload: ExamUpdateSchema, db: Session = Depends(get_db)) -> ExamResponseSchema:
+    """Sınav tarihini günceller."""
     exam_repository = ExamRepository(db)
     flashcard_repository = FlashcardRepository(db)
     exam_service = ExamService(exam_repository, flashcard_repository)
@@ -86,6 +94,7 @@ def update_exam(exam_id: str, update_payload: ExamUpdateSchema, db: Session = De
 
 @router.delete("/{exam_id}")
 def delete_exam(exam_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
+    """Sınavı ve ilişkili tüm flashcard'ları siler."""
     exam_repository = ExamRepository(db)
     exam = exam_repository.get(exam_id)
     if exam is None:
@@ -96,6 +105,7 @@ def delete_exam(exam_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
 
 @router.get("/{exam_id}/flashcards", response_model=list[FlashcardResponseSchema])
 def list_exam_flashcards(exam_id: str, db: Session = Depends(get_db)) -> list[FlashcardResponseSchema]:
+    """Belirli bir sınava ait tüm flashcard'ları listeler."""
     exam_repository = ExamRepository(db)
     flashcard_repository = FlashcardRepository(db)
     exam = exam_repository.get(exam_id)
@@ -116,6 +126,7 @@ def list_exam_flashcards(exam_id: str, db: Session = Depends(get_db)) -> list[Fl
 
 @router.post("/{exam_id}/generate-ai-cards", response_model=list[FlashcardResponseSchema])
 async def generate_ai_cards_for_exam(exam_id: str, db: Session = Depends(get_db)) -> list[FlashcardResponseSchema]:
+    """Yapay zekâ ile otomatik flashcard üretir ve veritabanına kaydeder."""
     exam_repository = ExamRepository(db)
     flashcard_repository = FlashcardRepository(db)
     exam = exam_repository.get(exam_id)
@@ -128,8 +139,6 @@ async def generate_ai_cards_for_exam(exam_id: str, db: Session = Depends(get_db)
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=503, detail="Yapay zekâ servisi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.")
-
-    from app.domain.models import Flashcard
 
     created = []
     for item in ai_cards:

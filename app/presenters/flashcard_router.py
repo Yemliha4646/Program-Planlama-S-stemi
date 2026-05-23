@@ -16,13 +16,17 @@ def create_flashcard(flashcard_payload: FlashcardCreateSchema, db: Session = Dep
     flashcard_service = FlashcardService(flashcard_repository)
     exam = exam_repository.get(flashcard_payload.exam_id)
     if exam is None:
-        raise HTTPException(status_code=404, detail="Exam bulunamadı.")
+        raise HTTPException(status_code=404, detail="Belirtilen sınav bulunamadı. Flashcard eklenemiyor.")
 
-    flashcard = flashcard_service.create_flashcard(
-        exam,
-        flashcard_payload.front_side,
-        flashcard_payload.back_side,
-    )
+    try:
+        flashcard = flashcard_service.create_flashcard(
+            exam,
+            flashcard_payload.front_side,
+            flashcard_payload.back_side,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
     return FlashcardResponseSchema(
         card_id=flashcard.CardId,
         exam_id=flashcard.ExamId,
@@ -38,9 +42,13 @@ def update_flashcard_leitner(card_id: str, status_payload: LeitnerUpdateSchema, 
     flashcard_service = FlashcardService(flashcard_repository)
     flashcard = flashcard_repository.get(card_id)
     if flashcard is None:
-        raise HTTPException(status_code=404, detail="Flashcard bulunamadı.")
+        raise HTTPException(status_code=404, detail="Belirtilen flashcard bulunamadı.")
 
-    updated = flashcard_service.update_leitner(flashcard, status_payload.known)
+    try:
+        updated = flashcard_service.update_leitner(flashcard, status_payload.known)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
     return FlashcardResponseSchema(
         card_id=updated.CardId,
         exam_id=updated.ExamId,
@@ -55,5 +63,5 @@ def delete_flashcard(card_id: str, db: Session = Depends(get_db)) -> None:
     flashcard_repository = FlashcardRepository(db)
     flashcard = flashcard_repository.get(card_id)
     if flashcard is None:
-        raise HTTPException(status_code=404, detail="Flashcard bulunamadı.")
+        raise HTTPException(status_code=404, detail="Belirtilen flashcard bulunamadı.")
     flashcard_repository.delete(flashcard)

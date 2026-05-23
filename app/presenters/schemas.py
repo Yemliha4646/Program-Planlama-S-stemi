@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional
 
-from pydantic import BaseModel, Field, PositiveInt, constr, validator
+from pydantic import BaseModel, constr, validator
 
 from app.domain.enums import LeitnerBox
 
@@ -33,6 +33,8 @@ class ExamResponseSchema(BaseModel):
     exam_date: date
     remaining_days: int
     daily_target: int
+    flashcard_count: int = 0
+    mastered_count: int = 0
 
     class Config:
         from_attributes = True
@@ -62,7 +64,8 @@ class FlashcardResponseSchema(BaseModel):
 class StudySessionResponseSchema(BaseModel):
     remaining_days: int
     daily_target: int
-    completed_today: int
+    flashcard_count: int = 0
+    mastered_count: int = 0
 
 
 class FlashcardListResponseSchema(BaseModel):

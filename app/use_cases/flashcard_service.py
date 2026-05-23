@@ -11,11 +11,11 @@ class FlashcardService:
         normalized_front = front_side.strip()
         normalized_back = back_side.strip()
         if not normalized_front:
-            raise ValueError("FrontSide boş olamaz.")
+            raise ValueError("Soru alanı (ön yüz) boş bırakılamaz.")
         if len(normalized_front) > 500:
-            raise ValueError("FrontSide maksimum 500 karakter olmalıdır.")
+            raise ValueError("Soru alanı en fazla 500 karakter olabilir.")
         if not normalized_back:
-            raise ValueError("BackSide boş olamaz.")
+            raise ValueError("Cevap alanı (arka yüz) boş bırakılamaz.")
 
         flashcard = Flashcard.create(
             exam_id=exam.ExamId,
@@ -32,6 +32,7 @@ class FlashcardService:
                 flashcard.Status = LeitnerBox.Box3
             elif flashcard.Status == LeitnerBox.Box3:
                 flashcard.Status = LeitnerBox.Mastered
+            # Mastered → known=True: zaten en üst seviye, değişiklik yapma
         else:
             flashcard.Status = LeitnerBox.Box1
         return self.flashcard_repository.save(flashcard)

@@ -4,7 +4,7 @@ from datetime import date
 from typing import List
 from uuid import uuid4
 
-from sqlalchemy import Column, Date, ForeignKey, String
+from sqlalchemy import Date, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Enum as SqlEnum
 
@@ -25,13 +25,12 @@ class Exam(Base):
     ExamId: Mapped[str] = mapped_column(String(36), primary_key=True, index=True)
     CourseName: Mapped[str] = mapped_column(String(100), nullable=False)
     ExamDate: Mapped[date] = mapped_column(Date, nullable=False)
-    flashcards: Mapped[List["Flashcard"]]
 
+    # Tek tanımlama — sadece relationship (type annotation kaldırıldı)
     flashcards = relationship(
         "Flashcard",
         back_populates="exam",
         cascade="all, delete-orphan",
-        passive_deletes=True,
     )
 
     @classmethod
@@ -50,7 +49,9 @@ class Flashcard(Base):
     __tablename__ = "flashcards"
 
     CardId: Mapped[str] = mapped_column(String(36), primary_key=True, index=True)
-    ExamId: Mapped[str] = mapped_column(String(36), ForeignKey("exams.ExamId", ondelete="CASCADE"), nullable=False)
+    ExamId: Mapped[str] = mapped_column(
+        String(36), ForeignKey("exams.ExamId", ondelete="CASCADE"), nullable=False
+    )
     FrontSide: Mapped[str] = mapped_column(String(500), nullable=False)
     BackSide: Mapped[str] = mapped_column(String, nullable=False)
     Status: Mapped[LeitnerBox] = mapped_column(
@@ -58,7 +59,7 @@ class Flashcard(Base):
         nullable=False,
         default=LeitnerBox.Box1,
     )
-    exam: Mapped[Exam] = relationship("Exam", back_populates="flashcards")
+    exam = relationship("Exam", back_populates="flashcards")
 
     @classmethod
     def create(cls, exam_id: str, front_side: str, back_side: str) -> "Flashcard":

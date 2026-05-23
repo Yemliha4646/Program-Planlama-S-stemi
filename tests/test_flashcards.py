@@ -1,24 +1,14 @@
+"""Flashcard servisi birim testleri."""
+
 from datetime import date, timedelta
 
 import pytest
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.core.config import Base
+from app.domain.enums import LeitnerBox
 from app.domain.models import Exam, Flashcard
-from app.infrastructure.repositories import ExamRepository, FlashcardRepository
+from app.infrastructure.repositories import FlashcardRepository
 from app.use_cases.flashcard_service import FlashcardService
-
-
-@pytest.fixture(name="memory_session")
-def fixture_memory_session() -> Session:
-    engine = create_engine("sqlite:///:memory:", future=True)
-    Base.metadata.create_all(bind=engine)
-    session = Session(bind=engine, future=True)
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 def test_create_flashcard_and_read_data(memory_session: Session) -> None:
@@ -56,6 +46,26 @@ def test_promote_flashcard_through_leitner(memory_session: Session) -> None:
     assert promoted_mastered.Status.name == "Mastered"
 
 
+def test_mastered_card_stays_mastered_on_known(memory_session: Session) -> None:
+    """Mastered kartlara 'Bildim' basılınca seviye değişmemeli — zaten en üst."""
+    exam = Exam.create("Kimya", date.today() + timedelta(days=3))
+    memory_session.add(exam)
+    memory_session.commit()
+
+    repository = FlashcardRepository(memory_session)
+    service = FlashcardService(repository)
+    flashcard = service.create_flashcard(exam, "H2O nedir?", "Su molekülüdür.")
+
+    # Mastered'a kadar yükselt
+    flashcard = service.update_leitner(flashcard, True)   # Box1 → Box2
+    flashcard = service.update_leitner(flashcard, True)   # Box2 → Box3
+    flashcard = service.update_leitner(flashcard, True)   # Box3 → Mastered
+
+    # Mastered'da iken "Bildim" bas — Mastered kalmalı
+    result = service.update_leitner(flashcard, True)
+    assert result.Status.name == "Mastered"
+
+
 def test_reset_flashcard_to_box1_when_bilemedim(memory_session: Session) -> None:
     exam = Exam.create("Tarih", date.today() + timedelta(days=12))
     memory_session.add(exam)
@@ -65,8 +75,32 @@ def test_reset_flashcard_to_box1_when_bilemedim(memory_session: Session) -> None
     service = FlashcardService(repository)
     flashcard = service.create_flashcard(exam, "Tarihte ilk uygarlık?", "Mezopotamya uygarlığıdır.")
 
-    flashcard.Status = flashcard.Status.Box2
-    memory_session.commit()
+    flashcard = service.update_leitner(flashcard, True)  # Box1 → Box2
+    assert flashcard.Status.name == "Box2"
 
     reset_card = service.update_leitner(flashcard, False)
     assert reset_card.Status.name == "Box1"
+
+
+def test_create_flashcard_rejects_empty_front(memory_session: Session) -> None:
+    exam = Exam.create("Edebiyat", date.today() + timedelta(days=5))
+    memory_session.add(exam)
+    memory_session.commit()
+
+    repository = FlashcardRepository(memory_session)
+    service = FlashcardService(repository)
+
+    with pytest.raises(ValueError):
+        service.create_flashcard(exam, "   ", "Bir cevap")
+
+
+def test_create_flashcard_rejects_empty_back(memory_session: Session) -> None:
+    exam = Exam.create("Coğrafya", date.today() + timedelta(days=5))
+    memory_session.add(exam)
+    memory_session.commit()
+
+    repository = FlashcardRepository(memory_session)
+    service = FlashcardService(repository)
+
+    with pytest.raises(ValueError):
+        service.create_flashcard(exam, "Bir soru", "  ")
